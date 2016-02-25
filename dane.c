@@ -1,144 +1,180 @@
 #include "dane.h"
 
-struct pacjent *pacjenci=NULL;
-struct lekarz *lekarze=NULL;
-struct wizyta *wizyty=NULL;
+struct pacjent *pacjenci[PACJENCI];
+struct lekarz *lekarze[LEKARZE];
+struct urlop *urlopy[LEKARZE];
+struct wizyta *wizyty[PACJENCI];
 
-struct pacjent *dodajPacjenta(char *pesel,char *imie,char *nazwisko)
+char obciazenieLekarzy[12][30][LEKARZE];
+int liczbaLekarzy;
+int liczbaPacjentow;
+char nieudaneLogowania[PACJENCI];
+char zalogowaniPacjenci[PACJENCI];
+
+int odstep(int m1,int d1,int m2,int d2)
+{
+	if (m1==m2)return d2-d1;
+	else return (m2-m1)*30+d2-d1;
+}
+
+int znajdzPacjentaPotwierdzenie()
+{
+	for (int i=0;i<liczbaPacjentow;i++)
+		if (wizyty[i]!=NULL)
+			if (wizyty[i]->potwierdzenie==1)return i;
+	return -1;
+}
+
+void usunWizytyDzis(int m,int d)
+{
+	for (int i=0;i<liczbaPacjentow;i++)
+		if (wizyty[i]!=NULL)
+			if (wizyty[i]->dzien==d&&wizyty[i]->miesiac==m){
+				free(wizyty[i]);
+				wizyty[i]=NULL;
+			}
+}
+
+int lekarzNaId(char *imie,char *nazwisko)
+{
+	for (int i=0;i<liczbaLekarzy;i++)
+		if(lekarze[i]!=NULL)
+			if(strcmp(imie,lekarze[i]->imie)==0&&strcmp(nazwisko,lekarze[i]->nazwisko)==0)
+				return i;
+	return -1;
+}
+
+int peselNaId(char pesel[12])
+{
+	for (int i=0;i<PACJENCI;i++){
+		if (pacjenci[i]!=NULL)
+			if (strcmp(pesel,pacjenci[i]->pesel)==0)
+				return i;
+	}
+	return -1;
+}
+
+struct pacjent *wezPacjenta(int idp)
+{
+	if (idp>=0||idp<PACJENCI)
+		return pacjenci[idp];
+	else return NULL;
+}
+
+struct wizyta *znajdzWizyte(int idp)
+{
+	if (idp!=-1)return wizyty[idp];
+	else return NULL;
+}
+
+int dodajPacjenta(char *pesel,char *imie,char *nazwisko,char *haslo)
 {
 	struct pacjent *temp=malloc(sizeof(struct pacjent));
 	strcpy(temp->pesel,pesel);
 	strcpy(temp->imie,imie);
 	strcpy(temp->nazwisko,nazwisko);
-	temp->next=NULL;
-	if (pacjenci==NULL)
-		pacjenci=temp;
-	else
-	{
-		struct pacjent *ptr=pacjenci;
-		while(ptr->next!=NULL)
-			ptr=ptr->next;
-		ptr->next=temp;
+	strcpy(temp->haslo,haslo);
+	if (liczbaPacjentow==PACJENCI)
+		return -1;
+	if (peselNaId(pesel)!=-1)
+		return -2;
+	else {
+		pacjenci[liczbaPacjentow]=temp;
+		liczbaPacjentow++;
+		return liczbaPacjentow-1;
 	}
-	return temp;
 }
 
-struct lekarz *dodajLekarza(char *imie,char *nazwisko)
+int dodajLekarza(char *imie,char *nazwisko)
 {
 	struct lekarz *temp=malloc(sizeof(struct lekarz));
 	strcpy(temp->imie,imie);
 	strcpy(temp->nazwisko,nazwisko);
-	temp->next=NULL;
-	if (lekarze==NULL)
-		lekarze=temp;
-	else
-	{
-		struct lekarz *ptr=lekarze;
-		while(ptr->next!=NULL)
-			ptr=ptr->next;
-		ptr->next=temp;
+	if (liczbaLekarzy==LEKARZE)
+		return -1;
+	else if(lekarzNaId(imie,nazwisko)!=-1)return -2;
+	else {
+		lekarze[liczbaLekarzy]=temp;
+		liczbaLekarzy++;
+		return liczbaLekarzy-1;
 	}
-	return temp;
 }
 
-struct wizyta *dodajWizyte(struct termin *t,struct pacjent *p,struct lekarz *l,char potwierdzenie)
+int dodajWizyte(int miesiac,int dzien,int numer,int idp,int potwierdzenie)
 {
+	int idl=0;
+	char l[LEKARZE];
+	for (int i=0;i<liczbaLekarzy;i++)
+		l[i]=1;
+	for (int i=0;i<liczbaPacjentow;i++)
+		if (wizyty[i]!=NULL)
+			if (wizyty[i]->miesiac==miesiac&&wizyty[i]->dzien==dzien&&wizyty[i]->numer==numer)
+				l[wizyty[i]->idlekarza]=0;
+	for (int i=0;i<liczbaLekarzy;i++)
+		if (l[i]==1)
+			if (obciazenieLekarzy[miesiac-1][dzien-1][idl]>obciazenieLekarzy[miesiac-1][dzien-1][i])
+				idl=i;
+	if (l[idl]==0||obciazenieLekarzy[miesiac-1][dzien-1][idl]==NUMERY)return -1;
+	/*for (int i=0;i<liczbaLekarzy;i++)
+		if (obciazenieLekarzy[miesiac][dzien][idl]>obciazenieLekarzy[miesiac][dzien][i])
+			idl=i;
+	for (int i=0;i<liczbaPacjentow;i++)
+		if (wizyty[i]!=NULL)
+			if (wizyty[i]->idlekarza==idl&&wizyty[i]->miesiac==miesiac&&wizyty[i]->dzien==dzien&&wizyty[i]->numer==numer)
+				return -1;*/
+	if (wizyty[idp]!=NULL){
+		usunWizyteP(idp);
+	}
 	struct wizyta *temp=malloc(sizeof(struct wizyta));
-	temp->termin=t;
-	temp->pacjent=p;
-	temp->lekarz=l;
+	temp->miesiac=miesiac;
+	temp->dzien=dzien;
+	temp->numer=numer;
 	temp->potwierdzenie=potwierdzenie;
-	temp->next=NULL;
-	if (wizyty==NULL)
-		wizyty=temp;
-	else
-	{
-		struct wizyta *ptr=wizyty;
-		while(ptr->next!=NULL)
-			ptr=ptr->next;
-		ptr->next=temp;
-	}
-	return temp;
+	temp->idlekarza=idl;
+	wizyty[idp]=temp;
+	return 0;
 }
-struct pacjent *znajdzPacjenta(char *pesel)
+
+int usunWizyteP(int idp)
 {
-	struct pacjent *ptr=pacjenci;
-	while (ptr!=NULL)
-		if (!strcmp(ptr->pesel,pesel))return ptr;
-		else ptr=ptr->next;
-	return NULL;
+	if (wizyty[idp]!=NULL){
+		free(wizyty[idp]);
+		wizyty[idp]=NULL;
+		return 0;
+	}
+	else return -1;
 }
-struct lekarz *znajdzLekarza(char *imie,char *nazwisko)
+
+void usunWizyteL(int miesiac,int dzien,int idl)
 {
-	struct lekarz *ptr=lekarze;
-	while(ptr!=NULL)
-	{
-		if ((!strcmp(nazwisko,ptr->nazwisko))&&(!strcmp(imie,ptr->imie)))return ptr;
-		else ptr=ptr->next;
-	}
-	return NULL;
+	for (int i=0;i<liczbaPacjentow;i++)
+		if (wizyty[i]!=NULL)
+			if (wizyty[i]->idlekarza==idl&&wizyty[i]->miesiac==miesiac&&wizyty[i]->dzien==dzien){
+				free(wizyty[i]);
+				wizyty[i]=NULL;
+			}
 }
-struct wizyta *znajdzWizyte(struct termin *t,struct pacjent *p,struct lekarz *l)
+
+int zalogujPacjenta(char *pesel,char *haslo)
 {
-	struct wizyta *ptr=wizyty;
-	if (t)
-	{
-		while (ptr!=NULL)
-			if(ptr->termin->godzina==t->godzina&&ptr->termin->dzien==t->dzien&&ptr->termin->miesiac==t->miesiac&&ptr->termin->rok==t->rok)return ptr;
-			else ptr=ptr->next;
-		return NULL;
+	int idp=peselNaId(pesel);
+	if (zalogowaniPacjenci[idp]==1)return -4;
+	if (idp==-1)return -3;
+	if (nieudaneLogowania[idp]>PROG_LOGOWAN)
+		return -2;
+	else if (strcmp(haslo,pacjenci[idp]->haslo)!=0){
+		nieudaneLogowania[idp]++;
+		return -1;
 	}
-	else if (p)
-	{
-		while (ptr!=NULL)
-			if (!strcmp(ptr->pacjent->pesel,p->pesel))return ptr;
-			else ptr=ptr->next;
-		return NULL;
+	else {
+		zalogowaniPacjenci[idp]=1;
+		nieudaneLogowania[idp]=0;
+		return idp;
 	}
-	else if (l)
-	{
-		while (ptr!=NULL)
-			if((!strcmp(l->imie,ptr->lekarz->imie))&&(!strcmp(l->nazwisko,ptr->lekarz->nazwisko)))return ptr;
-			else ptr=ptr->next;
-		return NULL;
-	}
-	else return NULL;
 }
-void usunPacjenta(char *pesel)
+int wylogujPacjenta(int idp)
 {
-	struct pacjent *ptr=pacjenci;
-	if (ptr==NULL)return;
-	else if (!strcmp(ptr->pesel,pesel))
-	{
-		pacjenci=ptr->next;
-		free(ptr);
-	}
-	else while (ptr->next!=NULL)
-		if (!strcmp(ptr->next->pesel,pesel))
-		{
-			struct pacjent *temp=ptr->next;
-			ptr->next=temp->next;
-			free (temp);
-			return;
-		}
-		else ptr=ptr->next;
-}
-void usunLekarza(char *imie,char *nazwisko)
-{
-	struct lekarz *ptr=lekarze;
-	if (ptr==NULL)return;
-	else if ((!strcmp(ptr->nazwisko,nazwisko))&&(!strcmp(ptr->imie,imie)))
-	{
-		lekarze=ptr->next;
-		free(ptr);
-	}
-	else while (ptr->next!=NULL)
-		if ((!strcmp(ptr->nazwisko,nazwisko))&&(!strcmp(ptr->imie,imie)))
-		{
-			struct lekarz *temp=ptr->next;
-			ptr->next=temp->next;
-			free (temp);
-			return;
-		}
-		else ptr=ptr->next;
+	if (zalogowaniPacjenci[idp]==0)return -2;
+	zalogowaniPacjenci[idp]=0;
+	return idp;
 }
