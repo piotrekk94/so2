@@ -8,19 +8,12 @@
 #include <signal.h>
 #include "struktury.h"
 
-char imie[16]="Krul";
-char nazwisko[16]="Korwin";
-char pesel[12]="21362138";
-char haslo[9]="xD";
+char imie[16];
+char nazwisko[16];
+char pesel[12];
+char haslo[9];
 int id,idpacjenta,zalogowany=0;
 char oczekiwanieNaPotwierdzenie=0;
-
-void funkcja()
-{
-	if (oczekiwanieNaPotwierdzenie==1)
-		oczekiwanieNaPotwierdzenie=0;
-	signal(SIGINT,funkcja);
-}
 
 void init()
 {
@@ -113,7 +106,6 @@ void rejestrujWizyte()
 	msgsnd(id,&snd,sizeof(struct msgbuf),0);
 	msgrcv(id,&rcv,sizeof(struct msgbuf),getpid(),0);
 	if (rcv.subtype==0)printf("Zarejestrowano\n");
-	else if (rcv.subtype==1)printf("Zmieniono termin wizyty\n");
 	else printf("Blad\n");
 }
 
@@ -220,8 +212,10 @@ void zaloguj()
 	else if (idp==-1)printf("Zle haslo\n");
 	else {
 		printf("Zalogowany\nID pacjenta :%d\n",idp);
-		if (wiadomosc!=NULL)
+		while(wiadomosc!=NULL){
 			printf("%s\n",wiadomosc);
+			wiadomosc=strtok(NULL,";");
+		}
 		idpacjenta=idp;
 		zalogowany=1;
 	}
@@ -251,7 +245,6 @@ int main()
 {
 	id=msgget(1,0644|IPC_CREAT);
 	init();
-	signal(SIGINT,funkcja);
 	while (1) {
 		int wybor;
 		printf("1.Zaloguj\n2.Rejestruj pacjenta\n3.Rejestruj wizyte\n4.Przesun wizyte\n5.Sprawdz wolne terminy w dniu\n6.Odwolaj wizyte\n7.Zmien haslo logowania\n8.Wyloguj\n9.Potwierdz wizyte\n10.Informacja o wizycie\n11.Wyjdz\n");

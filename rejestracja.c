@@ -11,6 +11,7 @@
 int id;
 
 extern char obciazenieLekarzy[12][30][LEKARZE];
+extern char nieudaneLogowania[PACJENCI];
 extern struct lekarz *lekarze[LEKARZE];
 extern struct wizyta *wizyty[PACJENCI];
 extern int liczbaPacjentow;
@@ -22,7 +23,7 @@ int nastepnyDzien=0;
 void funkcja()
 {
 	int wybor;
-	printf("Co chcesz zrobic?\n1.Przejsc o X dni do przodu\n2.Wyswietlic wszytskie wizyty\n");
+	printf("Co chcesz zrobic?\n1.Przejsc o X dni do przodu\n2.Wyswietlic wszytskie wizyty\n3.Odblokuj konto pacjenta o podanym ID\n");
 	scanf("%d",&wybor);
 	if (wybor==1){
 		scanf("%d",&nastepnyDzien );
@@ -30,7 +31,12 @@ void funkcja()
 	else if (wybor==2){
 		for (int i=0;i<liczbaPacjentow;i++)
 			if (wizyty[i]==NULL)printf("Pacjent o ID :%d brak wizyty\n",i);
-			else printf("Pacjent o ID :%d wizyta %d.%d:%d u %d , %d\n",i,wizyty[i]->dzien,wizyty[i]->miesiac,wizyty[i]->numer,wizyty[i]->idlekarza,wizyty[i]->potwierdzenie);
+			else printf("Pacjent o ID :%d wizyta %02d.%02d:%d u %d ,Potwierdzenie : %d\n",i,wizyty[i]->dzien,wizyty[i]->miesiac,wizyty[i]->numer,wizyty[i]->idlekarza,wizyty[i]->potwierdzenie);
+	}
+	else if (wybor==3){
+		int idp;
+		scanf("%d",&idp);
+		nieudaneLogowania[idp]=0;
 	}
 	signal(SIGINT,funkcja);
 }
@@ -79,7 +85,7 @@ void informacjeOWizycie(struct msgbuf *rcv)
 	if (idp!=-1){
 		if(wizyty[idp]!=NULL){
 			snd.subtype=0;
-			sprintf(snd.msg,"%2d.%2d:%d u %s %s",wizyty[idp]->dzien,wizyty[idp]->miesiac,wizyty[idp]->numer,lekarze[wizyty[idp]->idlekarza]->imie,lekarze[wizyty[idp]->idlekarza]->nazwisko);
+			sprintf(snd.msg,"%2d.%02d:%d u %s %s",wizyty[idp]->dzien,wizyty[idp]->miesiac,wizyty[idp]->numer,lekarze[wizyty[idp]->idlekarza]->imie,lekarze[wizyty[idp]->idlekarza]->nazwisko);
 		}
 		else snd.subtype=1;
 	}
@@ -112,7 +118,7 @@ void przesunWizyte(struct msgbuf *rcv)
 				if (j==wizyty[idp]->dzien)
 					k=wizyty[idp]->numer+1;
 					if (dodajWizyte(i,j,k,idp,potw)==0){
-						sprintf(snd.msg,"%d %d:%d",i,j,k);
+						sprintf(snd.msg,"%2d.%02d:%d",j,i,k);
 						snd.subtype=0;
 						i=13;
 						j=31;
@@ -150,7 +156,7 @@ void rejestrujWizyte(struct msgbuf *rcv)
 	else snd.subtype=1;
 	snd.msg[0]='\0';
 	msgsnd(id,&snd,sizeof(struct msgbuf),0);
-	if (snd.subtype==0)printf("Zarejestrowano wizyte %s o %d.%d:%d\n",pesel,m,d,n);
+	if (snd.subtype==0)printf("Zarejestrowano wizyte %s o %2d.%02d:%d\n",pesel,d,m,n);
 	else printf("%s probowal zarejestrowac wizyte\n",pesel);
 }
 
@@ -202,13 +208,17 @@ void terminyLekarza(struct msgbuf *rcv)
 		snd.subtype=1;
 	}
 	else {
-		for (int i=0;i<liczbaPacjentow;i++)
-			if (wizyty[i]!=NULL)
-				if (wizyty[i]->idlekarza==idl){
-					char temp[10];
-					sprintf(temp,"%2d.%2d:%d;",wizyty[i]->miesiac,wizyty[i]->dzien,wizyty[i]->numer);
+		int wizyty=0;
+		for (int i=miesiac;i<13&&wizyty<10;i++)
+			for (int j=1;j<31;j++){
+				if (i==miesiac&&j==1)j=dzien;
+				if (obciazenieLekarzy[i-1][j-1][idl]<NUMERY){
+					char temp[7];
+					sprintf(temp,"%2d.%02d;",j,i);
 					strcat(snd.msg,temp);
+					wizyty++;
 				}
+			}
 	}
 	msgsnd(id,&snd,sizeof(struct msgbuf),0);
 }
@@ -228,7 +238,7 @@ void urlop(struct msgbuf *rcv)
 		usunWizytyDzis(msc,dz);
 		obciazenieLekarzy[msc-1][dz-1][idl]=NUMERY;
 	}
-	printf("%s %s ma urlop %d.%2d \n",imie,nazwisko,dz,msc);
+	printf("%s %s ma urlop %d.%02d \n",imie,nazwisko,dz,msc);
 }
 
 void lekarzeWTerminie(struct msgbuf *rcv)
@@ -255,7 +265,6 @@ void lekarzeWTerminie(struct msgbuf *rcv)
 	else snd.subtype=1;
 	msgsnd(id,&snd,sizeof(struct msgbuf),0);
 }
-
 void zalogujP(struct msgbuf *rcv)
 {
 	int idp;
@@ -266,6 +275,12 @@ void zalogujP(struct msgbuf *rcv)
 	idp=zalogujPacjenta(pesel,haslo);
 	sprintf(snd.msg,"%d;",idp);
 	if (wizyty[idp]!=NULL&&wizyty[idp]->potwierdzenie==1)strcat(snd.msg,"Wizyta wymaga potwierdzenia;");
+	if (nieudaneLogowania[idp]>0){
+		char temp[24];
+		sprintf(temp,"Nieudane logowania :%02d;",nieudaneLogowania[idp]);
+		strcat(snd.msg,temp);
+		printf("%s\n",temp);
+	}
 	snd.type=rcv->sender;
 	snd.subtype=0;
 	msgsnd(id,&snd,sizeof(struct msgbuf),0);
@@ -303,7 +318,8 @@ void rejestrujL(struct msgbuf *rcv)
 	snd.subtype=0;
 	strcpy(snd.msg,temp);
 	msgsnd(id,&snd,sizeof(struct msgbuf),0);
-	printf("%s %s zarejestrowal sie\n",imie,nazwisko );
+	if (idl>=0)printf("%s %s zarejestrowal sie\n",imie,nazwisko );
+	else printf("%s %s probowal zarejestrowac sie\n",imie,nazwisko );
 }
 
 void wylogujP(struct msgbuf *rcv)
@@ -323,7 +339,7 @@ void wylogujP(struct msgbuf *rcv)
 int main()
 {
 	id=msgget(1,0644|IPC_CREAT);
-	printf("Dzisiaj jest %2d.%2d\n",dzien,miesiac);
+	printf("Dzisiaj jest %2d.%02d\n",dzien,miesiac);
 	signal(SIGINT,funkcja);
 	while(1)
 	{

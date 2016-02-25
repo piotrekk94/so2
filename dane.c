@@ -168,7 +168,6 @@ int zalogujPacjenta(char *pesel,char *haslo)
 	}
 	else {
 		zalogowaniPacjenci[idp]=1;
-		nieudaneLogowania[idp]=0;
 		return idp;
 	}
 }

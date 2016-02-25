@@ -1,14 +1,15 @@
 #define _SVID_SOURCE
 #include <unistd.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <sys/types.h>
 #include <sys/ipc.h>
 #include <sys/msg.h>
 #include <string.h>
 #include "struktury.h"
 
-char imie[16]="Jonasz";
-char nazwisko[16]="Koran-Mekka";
+char imie[16];
+char nazwisko[16];
 int id;
 
 void urlop()
@@ -48,6 +49,7 @@ void rejestruj()
 	if (idl==-1)printf("Brak miejsc w bazie\n");
 	else if (idl==-2)printf("Juz istnieje lekarz o tych danych");
 	else printf("Zarejestrowany\nID lekarza :%d\n",idl);
+	if (idl<0) exit(0);
 }
 
 void init()
@@ -61,8 +63,7 @@ void init()
 int main()
 {
 	id=msgget(1,0644|IPC_CREAT);
-	//init();
-	rejestruj();
+	init();
 	while (1) {
 		int wybor;
 		printf("1.Zarejestruj sie w bazie\n2.Wez urlop\n");
